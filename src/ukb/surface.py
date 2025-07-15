@@ -100,6 +100,7 @@ def main(
     case: Literal["ED", "ES", "both"] = "ED",
     use_burns: bool = False,
     burns_path: Path | None = None,
+    custom_points: Points | None = None,
 ) -> None:
     """Main function to generate  surfas from the UK Biobank atlas.
 
@@ -146,6 +147,7 @@ def main(
             "case": case,
             "use_burns": use_burns,
             "burns_path": str(burns_path) if burns_path else None,
+            "custom_points": None
         },
         indent=4,
         sort_keys=True,
@@ -166,6 +168,8 @@ def main(
             mode=mode,
             std=std,
         )
+    elif custom_points is not None:
+        points = custom_points
     else:
         filename = atlas.download_atlas(cache_dir, all=all)
 

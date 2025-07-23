@@ -97,7 +97,7 @@ def main(
     std: float = 1.5,
     verbose: bool = False,
     cache_dir: Path = Path.home() / ".ukb",
-    case: Literal["ED", "ES", "both"] = "ED",
+    case: Literal["ED", "ES", "both", "unloaded_ED", "all"] = "ED",
     use_burns: bool = False,
     burns_path: Path | None = None,
     custom_points: Points | None = None,
@@ -155,7 +155,7 @@ def main(
     )
 
     cache_dir.mkdir(exist_ok=True, parents=True)
-    (folder / "parameters.json").write_text(args_json)
+    
 
     from . import atlas
 
@@ -177,28 +177,32 @@ def main(
 
     if case == "both":
         cases = ["ED", "ES"]
+    elif case == "all":
+        cases = ["ED","ES","unloaded_ED"]
     else:
         cases = [case]
 
     for c in cases:
+        os.makedirs(folder / c, exist_ok=True)
+        (folder / c / "parameters.json").write_text(args_json)
         epi = get_epi_mesh(
             points=getattr(points, c),
         )
-        epi.write(str(folder / f"EPI_{c}.stl"))
+        epi.write(str(folder / c / f"EPI_{c}.stl"))
         logger.info(f"Saved {folder / f'EPI_{c}.stl'}")
 
         for valve in ["MV", "AV", "TV", "PV"]:
             valve_mesh = get_valve_mesh(surface_name=valve, points=getattr(points, c))
-            valve_mesh.write(str(folder / f"{valve}_{c}.stl"))
-            logger.info(f"Saved {folder / f'{valve}_{c}.stl'}")
+            valve_mesh.write(str(folder / c / f"{valve}_{c}.stl"))
+            logger.info(f"Saved {folder / c /f'{valve}_{c}.stl'}")
 
         for chamber in ["LV", "RV", "RVFW"]:
             chamber_mesh = get_chamber_mesh(
                 surface_name=chamber,
                 points=getattr(points, c),
             )
-            chamber_mesh.write(str(folder / f"{chamber}_{c}.stl"))
-            logger.info(f"Saved {folder / f'{chamber}_{c}.stl'}")
+            chamber_mesh.write(str(folder / c / f"{chamber}_{c}.stl"))
+            logger.info(f"Saved {folder / c / f'{chamber}_{c}.stl'}")
 
 
 class Surface(NamedTuple):

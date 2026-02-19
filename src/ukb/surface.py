@@ -3,7 +3,6 @@ from pathlib import Path
 import os
 import json
 from argparse import ArgumentParser
-
 import meshio
 import numpy as np
 import logging
@@ -16,7 +15,6 @@ here = Path(__file__).parent.absolute()
 
 connectivity_file = here / "connectivity.txt"
 connectivity = np.loadtxt(connectivity_file, dtype=int)
-
 
 def add_parser_arguments(parser: ArgumentParser) -> None:
     parser.add_argument(
@@ -71,7 +69,7 @@ def add_parser_arguments(parser: ArgumentParser) -> None:
     parser.add_argument(
         "-c",
         "--case",
-        choices=["ED", "ES", "both"],
+        choices=["ED", "ES", "unloaded", "both"],
         default="ED",
         help="Case to generate surfaces for.",
     )
@@ -99,12 +97,12 @@ def main(
     std: float = 1.5,
     verbose: bool = False,
     cache_dir: Path = Path.home() / ".ukb",
-    case: Literal["ED", "ES", "both"] = "ED",
+    case: Literal["ED", "ES", "both", "unloaded", "all"] = "ED",
     use_burns: bool = False,
     burns_path: Path | None = None,
     custom_points: atlas.Points | None = None,
 ) -> None:
-    """Main function to generate  surfas from the UK Biobank atlas.
+    """Main function to generate  surfaces from the UK Biobank atlas.
 
     Parameters
     ----------
@@ -133,7 +131,10 @@ def main(
     burns_path : Path | None
         Path to the burns atlas file. This will be a .mat file which will be loaded
         using scipy.io.loadmat. This needs to be specified if `use_burns`
-
+    custom_points : Points | None
+        3D points to generate the atlas from. If this argument is not None,
+        'all', 'mode', 'std', 'cache_dir', 'use_burns', and 'burns_path' will be 
+        disregarded.
     """
 
     folder.mkdir(exist_ok=True, parents=True)
@@ -149,6 +150,7 @@ def main(
             "case": case,
             "use_burns": use_burns,
             "burns_path": str(burns_path) if burns_path else None,
+            "custom_points": None
         },
         indent=4,
         sort_keys=True,
@@ -160,7 +162,6 @@ def main(
 
     if custom_points is not None:
         points = custom_points
-
     else:
         if use_burns:
             if burns_path is None:
@@ -173,33 +174,36 @@ def main(
             )
         else:
             filename = atlas.download_atlas(cache_dir, all=all)
-
             points = atlas.generate_points(filename=filename, mode=mode, std=std)
 
     if case == "both":
         cases = ["ED", "ES"]
+    elif case == "all":
+        cases = ["ED", "ES", "unloaded"]
     else:
         cases = [case]
 
-    for c in cases:
+    for case in cases:
+        out_path = folder/case
+        out_path.mkdir(exist_ok=True, parents=True)
         epi = get_epi_mesh(
-            points=getattr(points, c),
+            points=getattr(points, case),
         )
-        epi.write(str(folder / f"EPI_{c}.stl"))
-        logger.info(f"Saved {folder / f'EPI_{c}.stl'}")
+        epi.write(str(out_path / f"EPI_{case}.stl"))
+        logger.info(f"Saved {out_path / f'EPI_{case}.stl'}")
 
         for valve in ["MV", "AV", "TV", "PV"]:
-            valve_mesh = get_valve_mesh(surface_name=valve, points=getattr(points, c))
-            valve_mesh.write(str(folder / f"{valve}_{c}.stl"))
-            logger.info(f"Saved {folder / f'{valve}_{c}.stl'}")
+            valve_mesh = get_valve_mesh(surface_name=valve, points=getattr(points, case))
+            valve_mesh.write(str(out_path / f"{valve}_{case}.stl"))
+            logger.info(f"Saved {out_path / f'{valve}_{case}.stl'}")
 
         for chamber in ["LV", "RV", "RVFW"]:
             chamber_mesh = get_chamber_mesh(
                 surface_name=chamber,
-                points=getattr(points, c),
+                points=getattr(points, case),
             )
-            chamber_mesh.write(str(folder / f"{chamber}_{c}.stl"))
-            logger.info(f"Saved {folder / f'{chamber}_{c}.stl'}")
+            chamber_mesh.write(str(out_path / f"{chamber}_{case}.stl"))
+            logger.info(f"Saved {out_path / f'{chamber}_{case}.stl'}")
 
 
 class Surface(NamedTuple):

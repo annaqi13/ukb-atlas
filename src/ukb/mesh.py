@@ -149,7 +149,7 @@ def create_mesh_geo(
 
 def main(
     folder: Path,
-    case: Literal["ED", "ES", "both"] = "ED",
+    case: Literal["ED", "ES", "both", "unloaded", "all"] = "ED",
     char_length_max: float = 5.0,
     char_length_min: float = 5.0,
     verbose: bool = False,
@@ -179,64 +179,74 @@ def main(
             char_length_max=char_length_max,
             char_length_min=char_length_min,
         )
-    logger.info(f"Creating mesh for {case} with {char_length_max=}, {char_length_min=}")
+    if case == "both":
+        cases = ["ED", "ES"]
+    elif case == "all":
+        cases = ["ED", "ES", "unloaded"]
+    else:
+        cases = [case]
+    
     try:
         import gmsh
-
     except ImportError:
         logger.warning("gmsh python API not installed. Try subprocess.")
-        return create_mesh_geo(folder, char_length_max, char_length_min, case)
+        return create_mesh_geo(folder, char_length_max, char_length_min, c)
+    
+    for case in cases:
+        logger.info(f"Creating mesh for {case} with {char_length_max=}, {char_length_min=}")
+        gmsh.initialize()
+        if not verbose:
+            gmsh.option.setNumber("General.Verbosity", 0)
 
-    gmsh.initialize()
-    if not verbose:
-        gmsh.option.setNumber("General.Verbosity", 0)
+        out_path = folder/case
+        out_path.mkdir(exist_ok=True, parents=True)
 
-    # Merge all surfaces
-    gmsh.merge(f"{folder}/LV_{case}.stl")
-    gmsh.merge(f"{folder}/RV_{case}.stl")
-    gmsh.merge(f"{folder}/RVFW_{case}.stl")
-    gmsh.merge(f"{folder}/MV_{case}.stl")
-    gmsh.merge(f"{folder}/AV_{case}.stl")
-    gmsh.merge(f"{folder}/PV_{case}.stl")
-    gmsh.merge(f"{folder}/TV_{case}.stl")
-    gmsh.merge(f"{folder}/EPI_{case}.stl")
-    gmsh.model.mesh.removeDuplicateNodes()
-    gmsh.model.mesh.create_topology()
-    gmsh.model.mesh.create_geometry()
-    surfaces = gmsh.model.getEntities(2)
+        # Merge all surfaces
+        gmsh.merge(f"{out_path}/LV_{case}.stl")
+        gmsh.merge(f"{out_path}/RV_{case}.stl")
+        gmsh.merge(f"{out_path}/RVFW_{case}.stl")
+        gmsh.merge(f"{out_path}/MV_{case}.stl")
+        gmsh.merge(f"{out_path}/AV_{case}.stl")
+        gmsh.merge(f"{out_path}/PV_{case}.stl")
+        gmsh.merge(f"{out_path}/TV_{case}.stl")
+        gmsh.merge(f"{out_path}/EPI_{case}.stl")
+        gmsh.model.mesh.removeDuplicateNodes()
+        gmsh.model.mesh.create_topology()
+        gmsh.model.mesh.create_geometry()
+        surfaces = gmsh.model.getEntities(2)
 
-    gmsh.model.geo.addSurfaceLoop([s[1] for s in surfaces], 1)
-    vol = gmsh.model.geo.addVolume([1], 1)
-    gmsh.model.geo.synchronize()
+        gmsh.model.geo.addSurfaceLoop([s[1] for s in surfaces], 1)
+        vol = gmsh.model.geo.addVolume([1], 1)
+        gmsh.model.geo.synchronize()
 
-    physical_groups = {
-        "LV": [1],
-        "RV": [2, 3],
-        "MV": [4],
-        "AV": [5],
-        "PV": [6],
-        "TV": [7],
-        "EPI": [8],
-    }
-    for name, tag in physical_groups.items():
-        p = gmsh.model.addPhysicalGroup(2, tag)
-        gmsh.model.setPhysicalName(2, p, name)
+        physical_groups = {
+            "LV": [1],
+            "RV": [2, 3],
+            "MV": [4],
+            "AV": [5],
+            "PV": [6],
+            "TV": [7],
+            "EPI": [8],
+        }
+        for name, tag in physical_groups.items():
+            p = gmsh.model.addPhysicalGroup(2, tag)
+            gmsh.model.setPhysicalName(2, p, name)
 
-    p = gmsh.model.addPhysicalGroup(3, [vol], 9)
-    gmsh.model.setPhysicalName(3, p, "Wall")
+        p = gmsh.model.addPhysicalGroup(3, [vol], 9)
+        gmsh.model.setPhysicalName(3, p, "Wall")
 
-    gmsh.option.setNumber("Mesh.Optimize", 1)
-    gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
-    gmsh.option.setNumber("Mesh.Smoothing", 1)
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", char_length_max)
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", char_length_min)
-    gmsh.option.setNumber("Mesh.Algorithm3D", 1)
+        gmsh.option.setNumber("Mesh.Optimize", 1)
+        gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+        gmsh.option.setNumber("Mesh.Smoothing", 1)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", char_length_max)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", char_length_min)
+        gmsh.option.setNumber("Mesh.Algorithm3D", 1)
 
-    gmsh.model.geo.synchronize()
-    gmsh.model.mesh.generate(3)
-    gmsh.write(f"{folder}/{case}.msh")
-    logger.info(f"Created mesh {folder}/{case}.msh")
-    gmsh.finalize()
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.generate(3)
+        gmsh.write(f"{out_path}/mesh.msh")
+        logger.info(f"Created mesh {out_path}/mesh.msh")
+        gmsh.finalize()
 
 
 def create_clipped_mesh(
@@ -251,7 +261,7 @@ def create_clipped_mesh(
     Parameters
     ----------
     folder : Path
-        Path to the output folde
+        Path to the output folder
     name : str
         Case name
     char_length_max : float
@@ -261,62 +271,70 @@ def create_clipped_mesh(
     verbose : bool, optional
         Print verbose output, by default False
     """
-    logger.info(f"Creating clipped mesh for {case} with {char_length_max=}, {char_length_min=}")
+    if case == "both":
+        cases = ["ED", "ES"]
+    elif case == "all":
+        cases = ["ED", "ES", "unloaded"]
+    else:
+        cases = [case]
+
     try:
         import gmsh
-
     except ImportError:
         logger.warning("gmsh python API not installed. Try subprocess.")
         # return create_mesh_geo(folder, char_length_max, char_length_min, name)
         raise
-    gmsh.initialize()
-    if not verbose:
-        gmsh.option.setNumber("General.Verbosity", 0)
 
-    # Merge all surfaces
-    gmsh.merge(f"{folder}/lv_clipped.ply")
-    gmsh.merge(f"{folder}/rv_clipped.ply")
-    gmsh.merge(f"{folder}/epi_clipped.ply")
+    for case in cases:
+        logger.info(f"Creating clipped mesh for {case} with {char_length_max=}, {char_length_min=}")
+        gmsh.initialize()
+        if not verbose:
+            gmsh.option.setNumber("General.Verbosity", 0)
 
-    gmsh.model.mesh.removeDuplicateNodes()
-    gmsh.model.mesh.create_topology()
-    gmsh.model.mesh.create_geometry()
-    surfaces = gmsh.model.getEntities(2)
+        # Merge all surfaces
+        gmsh.merge(f"{folder}/lv_clipped.ply")
+        gmsh.merge(f"{folder}/rv_clipped.ply")
+        gmsh.merge(f"{folder}/epi_clipped.ply")
 
-    # Create base plane
-    base_ring = gmsh.model.geo.addCurveLoop([s[1] for s in surfaces], 1)
+        gmsh.model.mesh.removeDuplicateNodes()
+        gmsh.model.mesh.create_topology()
+        gmsh.model.mesh.create_geometry()
+        surfaces = gmsh.model.getEntities(2)
 
-    gmsh.model.geo.addPlaneSurface([base_ring], 4)
-    gmsh.model.geo.synchronize()
+        # Create base plane
+        base_ring = gmsh.model.geo.addCurveLoop([s[1] for s in surfaces], 1)
 
-    surfaces = gmsh.model.getEntities(2)
-    gmsh.model.geo.addSurfaceLoop([s[1] for s in surfaces], 1)
-    vol = gmsh.model.geo.addVolume([1], 1)
-    gmsh.model.geo.synchronize()
+        gmsh.model.geo.addPlaneSurface([base_ring], 4)
+        gmsh.model.geo.synchronize()
 
-    gmsh.model.geo.synchronize()
-    physical_groups = {
-        "LV": [1],
-        "RV": [2],
-        "EPI": [3],
-        "BASE": [4],
-    }
-    for n, tag in physical_groups.items():
-        p = gmsh.model.addPhysicalGroup(2, tag)
-        gmsh.model.setPhysicalName(2, p, n)
+        surfaces = gmsh.model.getEntities(2)
+        gmsh.model.geo.addSurfaceLoop([s[1] for s in surfaces], 1)
+        vol = gmsh.model.geo.addVolume([1], 1)
+        gmsh.model.geo.synchronize()
 
-    p = gmsh.model.addPhysicalGroup(3, [vol], 5)
-    gmsh.model.setPhysicalName(3, p, "Wall")
+        gmsh.model.geo.synchronize()
+        physical_groups = {
+            "LV": [1],
+            "RV": [2],
+            "EPI": [3],
+            "BASE": [4],
+        }
+        for n, tag in physical_groups.items():
+            p = gmsh.model.addPhysicalGroup(2, tag)
+            gmsh.model.setPhysicalName(2, p, n)
 
-    gmsh.option.setNumber("Mesh.Optimize", 1)
-    gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
-    gmsh.option.setNumber("Mesh.Smoothing", 1)
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMax", char_length_max)
-    gmsh.option.setNumber("Mesh.CharacteristicLengthMin", char_length_min)
-    gmsh.option.setNumber("Mesh.Algorithm3D", 1)
-    gmsh.model.geo.synchronize()
-    gmsh.model.mesh.generate(3)
-    outfile = (folder / f"{case}_clipped").with_suffix(".msh")
-    gmsh.write(str(outfile))
-    logger.info(f"Created mesh {outfile}")
-    gmsh.finalize()
+        p = gmsh.model.addPhysicalGroup(3, [vol], 5)
+        gmsh.model.setPhysicalName(3, p, "Wall")
+
+        gmsh.option.setNumber("Mesh.Optimize", 1)
+        gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+        gmsh.option.setNumber("Mesh.Smoothing", 1)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", char_length_max)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", char_length_min)
+        gmsh.option.setNumber("Mesh.Algorithm3D", 1)
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.generate(3)
+        outfile = (folder / f"{case}_clipped").with_suffix(".msh")
+        gmsh.write(str(outfile))
+        logger.info(f"Created mesh {outfile}")
+        gmsh.finalize()

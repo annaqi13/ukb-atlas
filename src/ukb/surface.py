@@ -9,6 +9,8 @@ import numpy as np
 import logging
 from typing import NamedTuple, Literal
 
+from . import atlas
+
 logger = logging.getLogger(__name__)
 here = Path(__file__).parent.absolute()
 
@@ -100,7 +102,7 @@ def main(
     case: Literal["ED", "ES", "both", "unloaded_ED", "all"] = "ED",
     use_burns: bool = False,
     burns_path: Path | None = None,
-    custom_points: Points | None = None,
+    custom_points: atlas.Points | None = None,
 ) -> None:
     """Main function to generate  surfas from the UK Biobank atlas.
 
@@ -157,23 +159,23 @@ def main(
     cache_dir.mkdir(exist_ok=True, parents=True)
     
 
-    from . import atlas
-
-    if use_burns:
-        if burns_path is None:
-            raise ValueError("If --use-burns is set, --burns-path must be specified.")
-
-        points = atlas.generate_points_burns(
-            filename=burns_path,
-            mode=mode,
-            std=std,
-        )
-    elif custom_points is not None:
+    if custom_points is not None:
         points = custom_points
-    else:
-        filename = atlas.download_atlas(cache_dir, all=all)
 
-        points = atlas.generate_points(filename=filename, mode=mode, std=std)
+    else:
+        if use_burns:
+            if burns_path is None:
+                raise ValueError("If --use-burns is set, --burns-path must be specified.")
+
+            points = atlas.generate_points_burns(
+                filename=burns_path,
+                mode=mode,
+                std=std,
+            )
+        else:
+            filename = atlas.download_atlas(cache_dir, all=all)
+
+            points = atlas.generate_points(filename=filename, mode=mode, std=std)
 
     if case == "both":
         cases = ["ED", "ES"]

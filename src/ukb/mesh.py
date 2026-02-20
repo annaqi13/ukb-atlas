@@ -149,7 +149,7 @@ def create_mesh_geo(
 
 def main(
     folder: Path,
-    case: Literal["ED", "ES", "both", "unloaded_ED", "all"] = "ED",
+    case: Literal["ED", "ES", "both", "unloaded", "all"] = "ED",
     char_length_max: float = 5.0,
     char_length_min: float = 5.0,
     verbose: bool = False,
@@ -182,33 +182,34 @@ def main(
     if case == "both":
         cases = ["ED", "ES"]
     elif case == "all":
-        cases = ["ED","ES","unloaded_ED"]
+        cases = ["ED", "ES", "unloaded"]
     else:
         cases = [case]
-
+    
     try:
         import gmsh
-
     except ImportError:
         logger.warning("gmsh python API not installed. Try subprocess.")
-        return create_mesh_geo(folder, char_length_max, char_length_min, case)
-
+        return create_mesh_geo(folder, char_length_max, char_length_min, c)
+    
     for case in cases:
         logger.info(f"Creating mesh for {case} with {char_length_max=}, {char_length_min=}")
-        
         gmsh.initialize()
         if not verbose:
             gmsh.option.setNumber("General.Verbosity", 0)
 
+        out_path = folder/case
+        out_path.mkdir(exist_ok=True, parents=True)
+
         # Merge all surfaces
-        gmsh.merge(f"{folder}/{case}/LV_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/RV_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/RVFW_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/MV_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/AV_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/PV_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/TV_{case}.stl")
-        gmsh.merge(f"{folder}/{case}/EPI_{case}.stl")
+        gmsh.merge(f"{out_path}/LV_{case}.stl")
+        gmsh.merge(f"{out_path}/RV_{case}.stl")
+        gmsh.merge(f"{out_path}/RVFW_{case}.stl")
+        gmsh.merge(f"{out_path}/MV_{case}.stl")
+        gmsh.merge(f"{out_path}/AV_{case}.stl")
+        gmsh.merge(f"{out_path}/PV_{case}.stl")
+        gmsh.merge(f"{out_path}/TV_{case}.stl")
+        gmsh.merge(f"{out_path}/EPI_{case}.stl")
         gmsh.model.mesh.removeDuplicateNodes()
         gmsh.model.mesh.create_topology()
         gmsh.model.mesh.create_geometry()
@@ -243,8 +244,8 @@ def main(
 
         gmsh.model.geo.synchronize()
         gmsh.model.mesh.generate(3)
-        gmsh.write(f"{folder}/{case}/mesh.msh")
-        logger.info(f"Created mesh {folder}/{case}/mesh.msh")
+        gmsh.write(f"{out_path}/mesh.msh")
+        logger.info(f"Created mesh {out_path}/mesh.msh")
         gmsh.finalize()
 
 
@@ -260,7 +261,7 @@ def create_clipped_mesh(
     Parameters
     ----------
     folder : Path
-        Path to the output folde
+        Path to the output folder
     name : str
         Case name
     char_length_max : float
@@ -273,13 +274,12 @@ def create_clipped_mesh(
     if case == "both":
         cases = ["ED", "ES"]
     elif case == "all":
-        cases = ["ED","ES","unloaded_ED"]
+        cases = ["ED", "ES", "unloaded"]
     else:
         cases = [case]
 
     try:
         import gmsh
-
     except ImportError:
         logger.warning("gmsh python API not installed. Try subprocess.")
         # return create_mesh_geo(folder, char_length_max, char_length_min, name)
@@ -287,7 +287,6 @@ def create_clipped_mesh(
 
     for case in cases:
         logger.info(f"Creating clipped mesh for {case} with {char_length_max=}, {char_length_min=}")
-        
         gmsh.initialize()
         if not verbose:
             gmsh.option.setNumber("General.Verbosity", 0)

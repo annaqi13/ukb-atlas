@@ -138,27 +138,7 @@ def main(
     """
 
     folder.mkdir(exist_ok=True, parents=True)
-
-    args_json = json.dumps(
-        {
-            "folder": str(folder),
-            "all": all,
-            "mode": mode,
-            "std": std,
-            "verbose": verbose,
-            "cache_dir": str(cache_dir),
-            "case": case,
-            "use_burns": use_burns,
-            "burns_path": str(burns_path) if burns_path else None,
-            "custom_points": None
-        },
-        indent=4,
-        sort_keys=True,
-        default=lambda o: str(o),
-    )
-
     cache_dir.mkdir(exist_ok=True, parents=True)
-    (folder / "parameters.json").write_text(args_json)
 
     if custom_points is not None:
         points = custom_points
@@ -184,8 +164,29 @@ def main(
         cases = [case]
 
     for case in cases:
+        # add the case to the output path
         out_path = folder/case
         out_path.mkdir(exist_ok=True, parents=True)
+
+        args_json = json.dumps(
+            {
+                "folder": str(folder),
+                "all": all,
+                "mode": mode,
+                "std": std,
+                "verbose": verbose,
+                "cache_dir": str(cache_dir),
+                "case": case,
+                "use_burns": use_burns,
+                "burns_path": str(burns_path) if burns_path else None,
+                "custom_points": None
+            },
+            indent=4,
+            sort_keys=True,
+            default=lambda o: str(o),
+        )
+        (folder / "parameters.json").write_text(args_json)
+
         epi = get_epi_mesh(
             points=getattr(points, case),
         )

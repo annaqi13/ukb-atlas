@@ -170,7 +170,7 @@ def main(
 
         args_json = json.dumps(
             {
-                "folder": str(folder),
+                "folder": str(out_path),
                 "all": all,
                 "mode": mode,
                 "std": std,
@@ -185,7 +185,7 @@ def main(
             sort_keys=True,
             default=lambda o: str(o),
         )
-        (folder / "parameters.json").write_text(args_json)
+        (out_path / "parameters.json").write_text(args_json)
 
         epi = get_epi_mesh(
             points=getattr(points, case),

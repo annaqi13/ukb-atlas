@@ -191,10 +191,15 @@ def main(
     except ImportError:
         logger.warning("gmsh python API not installed. Try subprocess.")
         return create_mesh_geo(folder, char_length_max, char_length_min, c)
+
+    if gmsh.is_initialized():
+        gmsh.finalize()
+    gmsh.initialize()
     
     for case in cases:
+        gmsh.clear()
         logger.info(f"Creating mesh for {case} with {char_length_max=}, {char_length_min=}")
-        gmsh.initialize()
+        # gmsh.initialize()
         if not verbose:
             gmsh.option.setNumber("General.Verbosity", 0)
 
@@ -246,7 +251,8 @@ def main(
         gmsh.model.mesh.generate(3)
         gmsh.write(f"{out_path}/mesh.msh")
         logger.info(f"Created mesh {out_path}/mesh.msh")
-        gmsh.finalize()
+
+    gmsh.finalize()
 
 
 def create_clipped_mesh(
@@ -337,4 +343,5 @@ def create_clipped_mesh(
         outfile = (folder / f"{case}_clipped").with_suffix(".msh")
         gmsh.write(str(outfile))
         logger.info(f"Created mesh {outfile}")
+        gmsh.clear()
         gmsh.finalize()

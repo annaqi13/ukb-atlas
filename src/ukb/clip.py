@@ -38,7 +38,8 @@ def add_parser_arguments(parser: ArgumentParser) -> None:
         "-oy",
         "--origin-y",
         type=float,
-        default=18.55767189380559,
+        # default=18.55767189380559,
+        default=8.55767189380559,
         help="Origin of the clipping plane in y direction.",
     )
     parser.add_argument(
@@ -143,6 +144,8 @@ def main(
     logger.info(f"Case: {case}")
     logger.info(f"Origin: {origin}")
     logger.info(f"Normal: {normal}")
+
+    folder = folder/case
 
     try:
         import pyvista as pv

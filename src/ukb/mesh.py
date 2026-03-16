@@ -292,6 +292,7 @@ def create_clipped_mesh(
         raise
 
     for case in cases:
+        folder = folder/case
         logger.info(f"Creating clipped mesh for {case} with {char_length_max=}, {char_length_min=}")
         gmsh.initialize()
         if not verbose:
